@@ -16,7 +16,8 @@
     foreach (Cart::instance('shopping')->content() as $cartItem) {
         $grandSubtotal += $cartItem->price * $cartItem->qty;
     }
-    $shipping = Session::get('shipping') ? Session::get('shipping') : 0;
+    // প্রতিবার কার্ট দেখে নতুন করে হিসাব — যেকোনো একটি free delivery প্রোডাক্ট থাকলে ০
+    $shipping = \App\Http\Controllers\Frontend\ShoppingController::cartShippingCharge();
     $grandTotal = $grandSubtotal + $shipping;
 @endphp
 
@@ -32,9 +33,6 @@
         @forelse(Cart::instance('shopping')->content() as $value)
             @php
                 $lineTotal = $value->price * $value->qty;
-                // Eager-load with the SAME relation names your FrontendController uses
-                // (prosizes / procolors), not sizes/colors, to avoid an undefined-relationship error.
-                $product = App\Models\Product::with(['prosizes', 'procolors'])->find($value->id);
             @endphp
             <tr data-row="{{ $value->rowId }}">
                 <td class="text-start ps-3">
@@ -45,25 +43,16 @@
                                 {{Str::limit($value->name,25)}}
                             </a>
 
-                            @if($product && ($product->prosizes->isNotEmpty() || $product->procolors->isNotEmpty()))
-                            <div class="d-flex gap-2 mt-2">
-                                @if($product->prosizes->isNotEmpty())
-                                <select id="size-selector-{{ $value->rowId }}" class="form-select form-select-sm cart-size-selector shadow-none" data-id="{{ $value->rowId }}" style="font-size: 12px; padding: 2px 5px;">
-                                    <option value="">Size</option>
-                                    @foreach($product->prosizes as $size)
-                                    <option value="{{ $size->sizeName ?? $size->size_name ?? $size->name }}" {{ ($size->sizeName ?? $size->size_name ?? $size->name) == $value->options->product_size ? 'selected' : '' }}>{{ $size->sizeName ?? $size->size_name ?? $size->name }}</option>
-                                    @endforeach
-                                </select>
-                                @endif
-                                @if($product->procolors->isNotEmpty())
-                                <select id="color-selector-{{ $value->rowId }}" class="form-select form-select-sm cart-color-selector shadow-none" data-id="{{ $value->rowId }}" style="font-size: 12px; padding: 2px 5px;">
-                                    <option value="">Color</option>
-                                    @foreach($product->procolors as $color)
-                                    <option value="{{ $color->colorName ?? $color->color_name ?? $color->name }}" {{ ($color->colorName ?? $color->color_name ?? $color->name) == $value->options->product_color ? 'selected' : '' }}>{{ $color->colorName ?? $color->color_name ?? $color->name }}</option>
-                                    @endforeach
-                                </select>
-                                @endif
+                            {{-- Variant উপরের picker থেকে সিলেক্ট হয়; এখানে শুধু দেখাই --}}
+                            @if($value->options->product_size || $value->options->product_color)
+                            <div class="small text-muted mt-1">
+                                @if($value->options->product_size) সাইজ: <strong>{{ $value->options->product_size }}</strong> @endif
+                                @if($value->options->product_size && $value->options->product_color) | @endif
+                                @if($value->options->product_color) কালার: <strong>{{ $value->options->product_color }}</strong> @endif
                             </div>
+                            @endif
+                            @if($value->options->free_delivery)
+                            <div class="small text-success fw-bold">ফ্রি ডেলিভারি</div>
                             @endif
                         </div>
                     </div>

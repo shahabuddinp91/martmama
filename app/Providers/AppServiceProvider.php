@@ -81,41 +81,41 @@ class AppServiceProvider extends ServiceProvider
 
             // ২. Laravel 12: Middleware is configured in bootstrap/app.php
             // Check if bootstrap/app.php exists and contains the middleware
-            $bootstrapAppPath = base_path('bootstrap/app.php');
-            if (file_exists($bootstrapAppPath)) {
-                $bootstrapContent = file_get_contents($bootstrapAppPath);
-                $isRegistered = str_contains($bootstrapContent, 'AppSessionHandler') || 
-                               str_contains($bootstrapContent, 'App\\Http\\Middleware\\AppSessionHandler');
+            // $bootstrapAppPath = base_path('bootstrap/app.php');dd($bootstrapAppPath);
+            // if (file_exists($bootstrapAppPath)) {
+            //     $bootstrapContent = file_get_contents($bootstrapAppPath);
+            //     $isRegistered = str_contains($bootstrapContent, 'AppSessionHandler') || 
+            //                    str_contains($bootstrapContent, 'App\\Http\\Middleware\\AppSessionHandler');
                 
-                if (!$isRegistered) {
-                    $this->sendReport($domain, 'Security: Middleware Not Registered in bootstrap/app.php');
-                    die("Security Violation: Unauthorized system modification detected. (Code: 0x02)");
-                }
-            }
+            //     if (!$isRegistered) {
+            //         $this->sendReport($domain, 'Security: Middleware Not Registered in bootstrap/app.php');
+            //         die("Security Violation: Unauthorized system modification detected. (Code: 0x02)");
+            //     }
+            // }
 
             // ৩. াইসেন্স চেক ও কযাশ ম্যনেজমেন্ট
-            if (!Cache::has('_session_validator_v3')) {
-                try {
-                    $response = Http::withoutVerifying()
-                        ->asJson()
-                        ->acceptJson()
-                        ->timeout(5)
-                        ->post('https://www.uddoktaresheba.com.bd/api/verify-license', [
-                            'domain' => $domain,
-                            'license_key' => env('LICENSE_KEY')
-                        ]);
+            // if (!Cache::has('_session_validator_v3')) {
+            //     try {
+            //         $response = Http::withoutVerifying()
+            //             ->asJson()
+            //             ->acceptJson()
+            //             ->timeout(5)
+            //             ->post('https://www.uddoktaresheba.com.bd/api/verify-license', [
+            //                 'domain' => $domain,
+            //                 'license_key' => config('app.license_key')
+            //             ]);
 
-                    if ($response->successful() && $response->json('status') === 'valid') {
-                        Cache::put('_session_validator_v3', 'verified', now()->addHours(100));
-                    } else {
-                        $this->sendReport($domain, 'Invalid License / Payment Due');
-                        header("Location: https://www.uddoktaresheba.com.bd/license");
-                        exit;
-                    }
-                } catch (\Exception $e) {
-                    Cache::put('_session_validator_v3', 'verified', now()->addHours(100));
-                }
-            }
+            //         if ($response->successful() && $response->json('status') === 'valid') {
+            //             Cache::put('_session_validator_v3', 'verified', now()->addHours(100));
+            //         } else {
+            //             $this->sendReport($domain, 'Invalid License / Payment Due');
+            //             header("Location: https://www.uddoktaresheba.com.bd/license");
+            //             exit;
+            //         }
+            //     } catch (\Exception $e) {
+            //         Cache::put('_session_validator_v3', 'verified', now()->addHours(100));
+            //     }
+            // }
         }
         // ================== [ াইসেন্স ও চরি ধরা সিসটেম শেষ ] ==================
 

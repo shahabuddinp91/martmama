@@ -55,6 +55,18 @@ class OrderDetails extends Model
         return $this->belongsTo(Size::class, 'product_size', 'id');
     }
 
+    // ✅ "Size: M, Color: Red" — ইনভয়েস/ইমেইলে দেখানোর জন্য (পুরনো অর্ডারে টেক্সট থাকলে সেটাই দেখায়)
+    public function getVariantTextAttribute(): ?string
+    {
+        $size  = $this->size->sizeName ?? (is_numeric($this->product_size) ? null : $this->product_size);
+        $color = $this->color?->getDisplayName() ?? (is_numeric($this->product_color) ? null : $this->product_color);
+
+        return collect(['Size' => $size, 'Color' => $color])
+            ->filter()
+            ->map(fn ($value, $label) => "{$label}: {$value}")
+            ->implode(', ') ?: null;
+    }
+
     // ✅ ইমেজ (প্রোডাক্ট আইডি দিয়ে)
     public function image()
     {

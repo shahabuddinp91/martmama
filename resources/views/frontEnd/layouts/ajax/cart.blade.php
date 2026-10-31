@@ -2,7 +2,7 @@
     $subtotal = Cart::instance('shopping')->subtotal();
     $subtotal = str_replace(',', '', $subtotal);
     $subtotal = str_replace('.00', '', $subtotal);
-    $shipping = Session::get('shipping') ? Session::get('shipping') : 0;
+    $shipping = \App\Http\Controllers\Frontend\ShoppingController::cartShippingCharge();
     $discount = Session::get('discount') ? Session::get('discount') : 0;
 @endphp
 <table class="cart_table table table-bordered table-striped text-center mb-0">
@@ -51,7 +51,7 @@
             </td>
         </tr>
         <tr>
-            <th colspan="3" class="text-end px-4">ডলিভারি চারজ</th>
+            <th colspan="3" class="text-end px-4">ডেলিভারি চার্জ</th>
             <td>
                 <span id="cart_shipping_cost"><span class="alinur">৳ </span><strong>{{$shipping}}</strong></span>
             </td>

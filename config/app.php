@@ -17,6 +17,9 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    // config:cache চালালে কোডে env() null দেয়, তাই লাইসেন্স কী config থেকে পড়া হয়
+    'license_key' => env('LICENSE_KEY'),
+
     'version' => env('APP_VERSION', '1.0.0'),
 
     /*

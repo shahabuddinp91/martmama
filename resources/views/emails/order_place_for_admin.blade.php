@@ -29,7 +29,7 @@
        <tbody>
            @foreach($order->orderdetails as $value)
             <tr>
-                <td style="border:1px solid #ddd;padding:10px;width:33.33%">{{$value->product_name}}</td>
+                <td style="border:1px solid #ddd;padding:10px;width:33.33%">{{$value->product_name}}@if($value->variant_text)<br><small>{{ $value->variant_text }}</small>@endif</td>
                 <td style="border:1px solid #ddd;padding:10px;width:33.33%">x {{$value->qty}}</td>
                 <td style="border:1px solid #ddd;padding:10px;width:33.33%">{{$value->qty*$value->sale_price}}</td>
             </tr>

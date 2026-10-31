@@ -7,6 +7,10 @@ use Illuminate\Http\Request;
 use App\Models\Productprice;
 use App\Models\Product;
 use App\Models\Coupon;
+use App\Models\Color;
+use App\Models\Size;
+use App\Models\ProductVariantPrice;
+use App\Models\ShippingCharge;
 use Toastr;
 use Cart;
 use DB;
@@ -88,7 +92,88 @@ class ShoppingController extends Controller
         return true;
     }
 
-    // ЁЯЯв Add to cart (GET)
+    /**
+     * কার্টে যেকোনো একটি free delivery প্রোডাক্ট থাকলে (অথবা সব ডিজিটাল হলে) ডেলিভারি চার্জ ০
+     */
+    public static function hasFreeDeliveryProduct(): bool
+    {
+        $productIds = Cart::instance('shopping')->content()->pluck('id')->unique();
+
+        if ($productIds->isEmpty()) {
+            return false;
+        }
+
+        $products = Product::whereIn('id', $productIds)->get(['id', 'free_delivery', 'is_digital']);
+
+        return $products->contains(fn ($p) => $p->free_delivery == 1)
+            || $products->every(fn ($p) => $p->is_digital == 1);
+    }
+
+    /**
+     * বর্তমান কার্ট অনুযায়ী ডেলিভারি চার্জ — প্রতিবার নতুন করে হিসাব হয়।
+     * Session-এ শুধু সিলেক্ট করা এরিয়া (shipping_id) ও তার আসল চার্জ থাকে, ০ বসানো হয় না,
+     * তাই free প্রোডাক্ট আনসিলেক্ট করলে এরিয়ার চার্জ আবার ফিরে আসে।
+     */
+    public static function cartShippingCharge(): float
+    {
+        if (self::hasFreeDeliveryProduct()) {
+            return 0;
+        }
+
+        $area = ShippingCharge::find(Session::get('shipping_id'));
+
+        return (float) ($area->amount ?? Session::get('shipping', 0));
+    }
+
+    /**
+     * Campaign/landing পেজের কার্ট আইটেম — variant (color/size) সহ।
+     * color_id / size_id / variant_price_id কী-গুলো OrderHelper::saveOrderDetails পড়ে,
+     * তাই সব ইনভয়েসে সাইজ ও কালার দেখায়।
+     */
+    public static function campaignCartItem(Product $product, $colorId = null, $sizeId = null, int $qty = 1): array
+    {
+        // কালার/সাইজ অপশন মাত্র একটা থাকলে সেটাই অটো সিলেক্ট
+        $variants = ProductVariantPrice::where('product_id', $product->id)->get(['color_id', 'size_id']);
+        $onlyColor = $variants->pluck('color_id')->filter()->unique();
+        $onlySize  = $variants->pluck('size_id')->filter()->unique();
+
+        $colorId = $colorId ?: ($onlyColor->count() === 1 ? $onlyColor->first() : null);
+        $sizeId  = $sizeId ?: ($onlySize->count() === 1 ? $onlySize->first() : null);
+
+        $variant = ($colorId || $sizeId)
+            ? ProductVariantPrice::where('product_id', $product->id)
+                ->where('color_id', $colorId)
+                ->where('size_id', $sizeId)
+                ->first()
+            : null;
+
+        $price = ($variant && $variant->price > 0)
+            ? $variant->price
+            : ($product->new_price ?: $product->old_price ?: 1);
+
+        return [
+            'id'    => $product->id,
+            'name'  => $product->name,
+            'qty'   => $qty,
+            'price' => (float) $price,
+            'options' => [
+                'slug'             => $product->slug,
+                'image'            => optional($product->image)->image ?? 'public/uploads/default.webp',
+                'old_price'        => (float) ($product->old_price ?? 0),
+                'purchase_price'   => (float) ($product->purchase_price ?? 0),
+                'advance_amount'   => (float) ($product->advance_amount ?? 0),
+                'is_digital'       => (int) ($product->is_digital ?? 0),
+                'free_delivery'    => (int) ($product->free_delivery ?? 0),
+                'color_id'         => $colorId,
+                'size_id'          => $sizeId,
+                'product_color'    => $colorId ? optional(Color::find($colorId))->getDisplayName() : null,
+                'product_size'     => $sizeId ? optional(Size::find($sizeId))->sizeName : null,
+                'variant_price_id' => $variant->id ?? null,
+            ],
+        ];
+    }
+
+    //ЁЯЯв Add to cart (GET)
     public function addTocartGet($id, Request $request)
     {
         $qty = 1;
@@ -392,38 +477,18 @@ class ShoppingController extends Controller
             return view('frontEnd.partials.cart_table');
         }
 
-        if ($action === 'remove') {
-            $existingRow = Cart::instance('shopping')
-                ->content()
-                ->where('id', $product->id)
-                ->first();
+        // Picker-এ প্রতি প্রোডাক্টের একটাই row থাকে — আগেরটা সরিয়ে নতুন variant দিয়ে বসাই (qty ঠিক রেখে)
+        $existingRow = Cart::instance('shopping')->content()->where('id', $product->id)->first();
+        $qty = $existingRow->qty ?? 1;
 
-            if ($existingRow) {
-                Cart::instance('shopping')->update($existingRow->rowId, 0);
-            }
-        } else {
-            $alreadyInCart = Cart::instance('shopping')
-                ->content()
-                ->where('id', $product->id)
-                ->isNotEmpty();
+        if ($existingRow) {
+            Cart::instance('shopping')->remove($existingRow->rowId);
+        }
 
-            if (!$alreadyInCart) {
-                Cart::instance('shopping')->add([
-                    'id'   => $product->id,
-                    'name' => $product->name,
-                    'qty'  => 1,
-                    'price'=> (float) ($product->new_price ?? $product->old_price ?? 1),
-                    'options' => [
-                        'slug'           => $product->slug,
-                        'image'          => optional($product->image)->image ?? 'public/uploads/default.webp',
-                        'old_price'      => (float) ($product->old_price ?? 0),
-                        'purchase_price' => (float) ($product->purchase_price ?? 0),
-                        'advance_amount' => (float) ($product->advance_amount ?? 0),
-                        'is_digital'     => (int) ($product->is_digital ?? 0),
-                        'free_delivery'  => (int) ($product->free_delivery ?? 0),
-                    ],
-                ]);
-            }
+        if ($action !== 'remove') {
+            Cart::instance('shopping')->add(
+                self::campaignCartItem($product, $request->product_color, $request->product_size, $qty)
+            );
         }
 
         return view('frontEnd.partials.cart_table');
