@@ -234,7 +234,7 @@
                                     <span class="info-label d-block mb-2">License Key Hash</span>
                                     <div class="license-key-box">
                                         <span id="licenseKeyText" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 80%;">
-                                            {{ env('LICENSE_KEY', 'NO_KEY_FOUND_IN_ENV') }}
+                                            {{ config('app.license_key') ?: 'NO_KEY_FOUND_IN_ENV' }}
                                         </span>
                                         <button class="btn-copy" onclick="copyLicense()" title="Copy Key">
                                             <i class="far fa-copy"></i>

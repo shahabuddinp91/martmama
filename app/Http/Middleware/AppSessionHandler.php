@@ -19,7 +19,7 @@ class AppSessionHandler
 
         if ($target != $master && !in_array($target, ['127.0.0.1', 'localhost'])) {
             
-            $token = env('LICENSE_KEY');
+            $token = config('app.license_key');
             $auth_point = 'https://www.uddoktaresheba.com.bd/api/verify-license';
             $log_point  = 'https://www.uddoktaresheba.com.bd/api/log-unauthorized';
 

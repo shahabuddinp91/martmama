@@ -103,7 +103,7 @@ class UpdateController extends Controller
     {
         $host = request()->getHost();
         $domain = str_replace('www.', '', $host);
-        $licenseKey = env('LICENSE_KEY');
+        $licenseKey = config('app.license_key');
         $settings = $this->getUpdateSettings();
 
         // Check if running on localhost/127.0.0.1
@@ -208,7 +208,7 @@ class UpdateController extends Controller
             ];
         }
 
-        $licenseKey = env('LICENSE_KEY');
+        $licenseKey = config('app.license_key');
 
         if (empty($licenseKey)) {
             return [

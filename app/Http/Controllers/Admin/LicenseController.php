@@ -14,7 +14,7 @@ class LicenseController extends Controller
         $apiUrl = "https://www.creativedesign.com.bd/api/verify-license"; 
         
         $domain = preg_replace('/^www\./', '', request()->getHost()); 
-        $license_key = env('LICENSE_KEY'); 
+        $license_key = config('app.license_key'); 
 
         try {
             $response = Http::withoutVerifying()

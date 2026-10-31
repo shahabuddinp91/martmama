@@ -322,8 +322,7 @@
                                     <div class="prod-details">
                                         <h5>{{ $product->product_name }}</h5>
                                         <div class="prod-meta">
-                                            @if($product->product_size) <span>Size: {{ $product->product_size }}</span> @endif
-                                            @if($product->product_color) <span>Color: {{ $product->product_color }}</span> @endif
+                                            @if($product->variant_text) <span>{{ $product->variant_text }}</span> @endif
                                         </div>
                                     </div>
                                 </div>

@@ -1030,20 +1030,21 @@ $brands = Brand::where('status', 1)
 
     public function shipping_charge(Request $request)
     {
-        // ⭐ Free Delivery Check - যদি সব প্রোডাক্ free delivery eligible য়, shipping charge 0
-        $hasAllFreeDelivery = \App\Http\Controllers\Frontend\ShoppingController::hasAllFreeDeliveryProducts();
-        
-        if ($hasAllFreeDelivery || $request->id == 'free_delivery') {
+        // শুধু সিলেক্ট করা এরিয়া ও তার আসল চার্জ রাখি — free delivery হলে
+        // ShoppingController::cartShippingCharge() প্রতিবার কার্ট দেখে ০ করে দেয়
+        $shipping = ShippingCharge::find($request->id);
+        if ($request->id == 'free_delivery') {
+            // checkout / reseller checkout JS এখনো এটা পাঠায়
             Session::put('shipping', 0);
             Session::put('shipping_id', null);
-        } else {
-            $shipping = ShippingCharge::where(['id' => $request->id])->first();
-            if ($shipping) {
-                Session::put('shipping', $shipping->amount);
-                Session::put('shipping_id', $shipping->id);
-            }
+        } elseif ($shipping) {
+            Session::put('shipping', $shipping->amount);
+            Session::put('shipping_id', $shipping->id);
         }
-        return view('frontEnd.layouts.ajax.cart');
+
+        // Campaign পেজ নিজের partial চায়, বাকি পেজ আগের মতো ajax.cart
+        $view = $request->boolean('campaign') ? 'frontEnd.partials.cart_table' : 'frontEnd.layouts.ajax.cart';
+        return view($view);
     }
 
     public function contact()
@@ -1113,25 +1114,14 @@ $brands = Brand::where('status', 1)
         $cart_count = Cart::instance('shopping')->count();
         $product = $products->first();
         if ($cart_count == 0 && $product) {
-            Cart::instance('shopping')->add([
-                'id'    => $product->id,
-                'name'  => $product->name,
-                'qty'   => 1,
-                'price' => $product->new_price,
-                'options' => [
-                    'slug'           => $product->slug,
-                    'image'          => $product->image->image,
-                    'old_price'      => $product->old_price,
-                    'purchase_price' => $product->purchase_price,
-                ],
-            ]);
+            Cart::instance('shopping')->add(ShoppingController::campaignCartItem($product));
         }
 
+        // ডিফল্ট এরিয়ার আসল চার্জ রাখি; free delivery হলে cartShippingCharge() নিজেই ০ দেখাবে
         $shippingcharge = ShippingCharge::where('status', 1)->get();
-        $select_charge  = ShippingCharge::where('status', 1)->first();
-        if ($select_charge) {
-            Session::put('shipping', $select_charge->amount);
-        }
+        $select_charge  = $shippingcharge->first();
+        Session::put('shipping', $select_charge->amount ?? 0);
+        Session::put('shipping_id', $select_charge->id ?? null);
 
         // ======================================================================
         // SAFE FIX: Fetch data dynamically using DB table check fallbacks

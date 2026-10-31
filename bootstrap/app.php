@@ -27,7 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
             // 🔒 LICENSE CHECKER (Security Fix)
             // এটি সবার শেষে যুক্ত করা হলো যাতে API এবং Web দুটোই চেক করে
-            \App\Http\Middleware\AppSessionHandler::class,
+            // \App\Http\Middleware\AppSessionHandler::class,
         ]);
 
         // =================================================================

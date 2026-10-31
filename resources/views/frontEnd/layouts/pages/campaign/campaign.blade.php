@@ -301,7 +301,9 @@
         .contact-card .phone-number { color: var(--red-600); font-family: 'Kalpurush', sans-serif; }
         .btn-call { background: var(--red-600); color: #fff; border-radius: 50px; font-weight: 700; }
         .btn-whatsapp { background: var(--forest-500); color: #fff; border-radius: 50px; font-weight: 700; }
-        .btn-call:hover, .btn-whatsapp:hover { color: #fff; opacity: .92; }
+        /* Bootstrap .btn:hover background transparent করে দেয়, তাই hover/focus এ নিজের কালার রাখি */
+        .btn.btn-call:hover, .btn.btn-call:focus, .btn.btn-call:active { background: var(--red-600); color: #fff; opacity: .9; }
+        .btn.btn-whatsapp:hover, .btn.btn-whatsapp:focus, .btn.btn-whatsapp:active { background: var(--forest-500); color: #fff; opacity: .9; }
 
         /* ---------- Description / benefits block ---------- */
         .details-card {
@@ -554,8 +556,10 @@
     foreach (Cart::instance('shopping')->content() as $cartItem) {
         $grandSubtotal += $cartItem->price * $cartItem->qty;
     }
-    $shipping = Session::get('shipping') ? Session::get('shipping') : 0;
+    $shipping = \App\Http\Controllers\Frontend\ShoppingController::cartShippingCharge();
     $grandTotal = $grandSubtotal + $shipping;
+    // একটা প্রোডাক্ট হলেও variant থাকলে picker দেখাতে হবে, নাহলে সাইজ/কালার সিলেক্ট করা যায় না
+    $showPicker = $products->count() > 1 || $products->contains(fn ($p) => $p->variantPrices()->exists());
 @endphp
 
 <body>
@@ -726,7 +730,7 @@
                     <div class="checkout-wrapper">
                         <h4 class="fw-bold mb-4"><i class="fa-solid fa-box-open me-2"></i> আপনার অফার চেক করুন</h4>
 
-                        @if($products->count() > 1)
+                        @if($showPicker)
                         <div class="mb-4">
                             <p class="pp-hint">
                                 <i class="fa-solid fa-hand-pointer"></i> নিচের বক্সে টিক (✓) দিয়ে পণ্য নির্বাচন করুন
@@ -740,8 +744,9 @@
                                     $hasVariant    = $productColors->count() > 0 || $productSizes->count() > 0;
                                     $existingRow   = Cart::instance('shopping')->content()->where('id', $product->id)->first();
                                     $isInCart      = (bool) $existingRow;
-                                    $currentColor  = $existingRow->options->product_color ?? null;
-                                    $currentSize   = $existingRow->options->product_size ?? null;
+                                    // অপশন একটা থাকলে সেটাই অটো সিলেক্ট
+                                    $currentColor  = $existingRow->options->color_id ?? ($productColors->count() === 1 ? $productColors->first()->id : null);
+                                    $currentSize   = $existingRow->options->size_id ?? ($productSizes->count() === 1 ? $productSizes->first()->id : null);
                                 @endphp
                                 <div class="pp-row {{ $isInCart ? 'checked' : '' }}" data-product-id="{{ $product->id }}" data-has-variant="{{ $hasVariant ? 1 : 0 }}">
                                     <label class="pp-row__main" for="product_{{ $product->id }}">
@@ -1000,7 +1005,7 @@
 
         // AJAX - Shipping Charge Calculation
         $("#area").on("change", function () {
-            cartAjax("{{route('shipping.charge')}}", { id: $(this).val() });
+            cartAjax("{{route('shipping.charge')}}", { id: $(this).val(), campaign: 1 });
         });
 
         /* =========================================================
@@ -1030,18 +1035,6 @@
                 if (!id) return;
                 cartAjax("{{route('cart.decrement')}}", { id: id });
             });
-
-            $(document).on('change', '.cart-size-selector', function () {
-                var rowId = $(this).data('id');
-                if (!rowId) return;
-                cartAjax("{{ route('cart.update') }}", { id: rowId, product_size: $(this).val() });
-            });
-
-            $(document).on('change', '.cart-color-selector', function () {
-                var rowId = $(this).data('id');
-                if (!rowId) return;
-                cartAjax("{{ route('cart.update') }}", { id: rowId, product_color: $(this).val() });
-            });
         }
 
         // ---------- Product picker: checkbox list + optional variants ----------
@@ -1051,6 +1044,26 @@
                 size:  $("input[name='pp_size_" + productId + "']:checked").val() || ''
             };
         }
+
+        // Row-এ যে variant group আছে (color/size) সবগুলো সিলেক্ট করা হয়েছে কিনা
+        function ppHasVariantSelection($row) {
+            var sel = ppGetSelection($row.data('product-id'));
+            var needsColor = $row.find('.pp-color-radio').length > 0;
+            var needsSize  = $row.find('.pp-size-radio').length > 0;
+            return !(needsColor && !sel.color) && !(needsSize && !sel.size);
+        }
+
+        // অর্ডার সাবমিটের আগে: সিলেক্ট করা প্রোডাক্টের সাইজ/কালার বাকি থাকলে আটকাও
+        $('form[action="{{ route('customer.ordersave') }}"]').on('submit', function (e) {
+            var $missing = $('.pp-row[data-has-variant="1"]').filter(function () {
+                return $(this).find('.pp-checkbox').is(':checked') && !ppHasVariantSelection($(this));
+            });
+            if ($missing.length) {
+                e.preventDefault();
+                $missing.each(function () { $('#ppWarning_' + $(this).data('product-id')).removeClass('d-none'); });
+                $missing.first()[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
 
         function ppSendChange(productId, action) {
             var sel = ppGetSelection(productId);
@@ -1067,31 +1080,22 @@
             var isChecked  = $checkbox.is(':checked');
             var hasVariant = $row.data('has-variant') == 1;
 
-            if (isChecked && hasVariant) {
-                var sel = ppGetSelection(productId);
-                var needsColor = $row.find('.pp-color-radio').length > 0;
-                var needsSize  = $row.find('.pp-size-radio').length > 0;
-                if ((needsColor && !sel.color) || (needsSize && !sel.size)) {
-                    $checkbox.prop('checked', false);
-                    $('#ppWarning_' + productId).removeClass('d-none');
-                    return;
-                }
-            }
-
-            $('#ppWarning_' + productId).addClass('d-none');
             $row.toggleClass('checked', isChecked);
+
+            // টিক দিলেই কার্টে যোগ হবে; সাইজ/কালার বাকি থাকলে warning থাকবে, অর্ডার সাবমিটে আটকাবে
+            var missingVariant = isChecked && hasVariant && !ppHasVariantSelection($row);
+            $('#ppWarning_' + productId).toggleClass('d-none', !missingVariant);
             ppSendChange(productId, isChecked ? 'add' : 'remove');
         });
 
-        // Changing color/size after the box is already checked updates
-        // the price/options on the row already in the cart.
+        // সাইজ বা কালার বদলালেই অটো টিক দিয়ে কার্টে যোগ/আপডেট করি
         $(document).on('change', '.pp-color-radio, .pp-size-radio', function () {
             var productId = $(this).data('product');
             var $row = $(this).closest('.pp-row');
-            $('#ppWarning_' + productId).addClass('d-none');
-            if ($row.find('.pp-checkbox').is(':checked')) {
-                ppSendChange(productId, 'add');
-            }
+
+            $('#ppWarning_' + productId).toggleClass('d-none', ppHasVariantSelection($row));
+            $row.addClass('checked').find('.pp-checkbox').prop('checked', true);
+            ppSendChange(productId, 'add');
         });
 
         // Countdown Logic

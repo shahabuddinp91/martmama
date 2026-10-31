@@ -463,15 +463,9 @@ if (typeof ttq !== 'undefined') {
         }
 
         // ✅ শিপিং চার্জ সেট
-        // ⭐ Free Delivery Check - যদি সব প্রোডাক্ট free delivery eligible হয়, shipping charge 0
-        $hasAllFreeDelivery = \App\Http\Controllers\Frontend\ShoppingController::hasAllFreeDeliveryProducts();
-        
-        if ($requires_shipping && !$hasAllFreeDelivery) {
-            $shipping = Session::get('shipping') ? Session::get('shipping') : 0;
-        } else {
-            $shipping = 0;
-            Session::put('shipping', 0);
-        }
+        // ⭐ Free Delivery Check - কার্টে যেকোনো একটি free delivery প্রোডাক্ট থাকলে shipping charge 0
+        $hasFreeDelivery = \App\Http\Controllers\Frontend\ShoppingController::hasFreeDeliveryProduct();
+        $shipping = $requires_shipping ? \App\Http\Controllers\Frontend\ShoppingController::cartShippingCharge() : 0;
 
         $discount = Session::get('discount', 0);
         // ⭐ Grand Total Calculation - Free delivery হলে shipping charge 0
@@ -960,25 +954,11 @@ if (typeof ttq !== 'undefined') {
         const hasAdvance = @json($hasAdvance ?? false);
         const requiresShipping = @json($requires_shipping ?? false);
         const cartItems = @json($cartItemsForJs ?? []);
-        const hasAllFreeDelivery = @json($hasAllFreeDelivery ?? false);
+        const hasFreeDelivery = @json($hasFreeDelivery ?? false);
 
-        // ⭐ Free Delivery Check Function
+        // ⭐ Free Delivery Check - সার্ভারের হিসাবই ব্যবহার করি (যেকোনো একটি free delivery প্রোডাক্ট থাকলে ০)
         function checkFreeDelivery() {
-            // Check if all physical products have free_delivery = 1
-            let allFreeDelivery = true;
-            for (let i = 0; i < cartItems.length; i++) {
-                let item = cartItems[i];
-                // Skip digital products
-                if (item.is_digital == 1) {
-                    continue;
-                }
-                // If any physical product doesn't have free_delivery, return false
-                if (item.free_delivery != 1) {
-                    allFreeDelivery = false;
-                    break;
-                }
-            }
-            return allFreeDelivery;
+            return hasFreeDelivery;
         }
 
         // এরিয়া পরিবর্তন হলে শিপিং চার্জ আপডেট
@@ -1015,7 +995,7 @@ if (typeof ttq !== 'undefined') {
         // ⭐ Page Load হওয়ার সময় Free Delivery Check করে Initial Shipping Charge Set করা
         $(document).ready(function() {
             // Check free delivery on page load
-            var isFreeDeliveryOnLoad = hasAllFreeDelivery || checkFreeDelivery();
+            var isFreeDeliveryOnLoad = checkFreeDelivery();
             
             if (isFreeDeliveryOnLoad) {
                 var shippingCharge = 0;

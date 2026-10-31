@@ -5,7 +5,8 @@
     foreach (Cart::instance('shopping')->content() as $cartItem) {
         $grandSubtotal += $cartItem->price * $cartItem->qty;
     }
-    $shipping = Session::get('shipping') ? Session::get('shipping') : 0;
+    // প্রতিবার কার্ট দেখে নতুন করে হিসাব — যেকোনো একটি free delivery প্রোডাক্ট থাকলে ০
+    $shipping = \App\Http\Controllers\Frontend\ShoppingController::cartShippingCharge();
     $grandTotal = $grandSubtotal + $shipping;
 ?>
 
@@ -21,9 +22,6 @@
         <?php $__empty_1 = true; $__currentLoopData = Cart::instance('shopping')->content(); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $value): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
             <?php
                 $lineTotal = $value->price * $value->qty;
-                // Eager-load with the SAME relation names your FrontendController uses
-                // (prosizes / procolors), not sizes/colors, to avoid an undefined-relationship error.
-                $product = App\Models\Product::with(['prosizes', 'procolors'])->find($value->id);
             ?>
             <tr data-row="<?php echo e($value->rowId); ?>">
                 <td class="text-start ps-3">
@@ -35,25 +33,16 @@
 
                             </a>
 
-                            <?php if($product && ($product->prosizes->isNotEmpty() || $product->procolors->isNotEmpty())): ?>
-                            <div class="d-flex gap-2 mt-2">
-                                <?php if($product->prosizes->isNotEmpty()): ?>
-                                <select id="size-selector-<?php echo e($value->rowId); ?>" class="form-select form-select-sm cart-size-selector shadow-none" data-id="<?php echo e($value->rowId); ?>" style="font-size: 12px; padding: 2px 5px;">
-                                    <option value="">Size</option>
-                                    <?php $__currentLoopData = $product->prosizes; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $size): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                    <option value="<?php echo e($size->sizeName ?? $size->size_name ?? $size->name); ?>" <?php echo e(($size->sizeName ?? $size->size_name ?? $size->name) == $value->options->product_size ? 'selected' : ''); ?>><?php echo e($size->sizeName ?? $size->size_name ?? $size->name); ?></option>
-                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                                </select>
-                                <?php endif; ?>
-                                <?php if($product->procolors->isNotEmpty()): ?>
-                                <select id="color-selector-<?php echo e($value->rowId); ?>" class="form-select form-select-sm cart-color-selector shadow-none" data-id="<?php echo e($value->rowId); ?>" style="font-size: 12px; padding: 2px 5px;">
-                                    <option value="">Color</option>
-                                    <?php $__currentLoopData = $product->procolors; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $color): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                    <option value="<?php echo e($color->colorName ?? $color->color_name ?? $color->name); ?>" <?php echo e(($color->colorName ?? $color->color_name ?? $color->name) == $value->options->product_color ? 'selected' : ''); ?>><?php echo e($color->colorName ?? $color->color_name ?? $color->name); ?></option>
-                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                                </select>
-                                <?php endif; ?>
+                            
+                            <?php if($value->options->product_size || $value->options->product_color): ?>
+                            <div class="small text-muted mt-1">
+                                <?php if($value->options->product_size): ?> সাইজ: <strong><?php echo e($value->options->product_size); ?></strong> <?php endif; ?>
+                                <?php if($value->options->product_size && $value->options->product_color): ?> | <?php endif; ?>
+                                <?php if($value->options->product_color): ?> কালার: <strong><?php echo e($value->options->product_color); ?></strong> <?php endif; ?>
                             </div>
+                            <?php endif; ?>
+                            <?php if($value->options->free_delivery): ?>
+                            <div class="small text-success fw-bold">ফ্রি ডেলিভারি</div>
                             <?php endif; ?>
                         </div>
                     </div>

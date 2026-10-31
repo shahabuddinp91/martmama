@@ -779,10 +779,10 @@ class CustomerController extends Controller
         $uddoktapay_gateway = PaymentGateway::where(['status'=> 1, 'type'=>'uddoktapay'])->first();
         $aamarpay_gateway = PaymentGateway::where(['status'=> 1, 'type'=>'aamarpay'])->first();
 
-        // ⭐ Free Delivery Check - যদি সব প্রোডাক্ট free delivery eligible হয়, shipping charge 0
-        $hasAllFreeDelivery = \App\Http\Controllers\Frontend\ShoppingController::hasAllFreeDeliveryProducts();
-        $shippingAmount = $hasAllFreeDelivery ? 0 : ($select_charge->amount ?? 0);
-        Session::put('shipping', $shippingAmount);
+        // ⭐ ডিফল্ট এরিয়ার আসল চার্জ রাখি; free delivery হলে cartShippingCharge() ০ দেখায়
+        Session::put('shipping', $select_charge->amount ?? 0);
+        Session::put('shipping_id', $select_charge->id ?? null);
+        $hasFreeDelivery = \App\Http\Controllers\Frontend\ShoppingController::hasFreeDeliveryProduct();
 
         $advanceTotal = \App\Http\Controllers\Frontend\ShoppingController::getCartAdvanceAmount();
         $hasAdvance   = $advanceTotal > 0;
@@ -844,7 +844,7 @@ class CustomerController extends Controller
             'advanceTotal',
             'hasAdvance',
             'hasDigital',
-            'hasAllFreeDelivery'
+            'hasFreeDelivery'
         ));
     }
 
@@ -874,18 +874,13 @@ public function order_save(Request $request)
         $subtotal = (float) str_replace([',','.00'],'',Cart::instance('shopping')->subtotal());
         $discount = Session::get('discount', 0);
         
-        // ⭐ Free Delivery Check - যদি সব প্রোডাক্ট free delivery eligible হয়, shipping charge 0
-        $hasAllFreeDelivery = \App\Http\Controllers\Frontend\ShoppingController::hasAllFreeDeliveryProducts();
-        $shipping_area = null;
-        
-        if ($hasAllFreeDelivery) {
-            $shippingfee = 0;
-            Session::put('shipping', 0);
-        } else {
-            $shipping_area = ShippingCharge::where('id', $request->area)->first();
-            $shippingfee = $shipping_area ? $shipping_area->amount : Session::get('shipping', 0);
-            Session::put('shipping', $shippingfee);
+        // ⭐ Free Delivery Check - কার্টে যেকোনো একটি free delivery প্রোডাক্ট থাকলে shipping charge 0 সেভ হবে
+        $shipping_area = ShippingCharge::find($request->area);
+        if ($shipping_area) {
+            Session::put('shipping', $shipping_area->amount);
+            Session::put('shipping_id', $shipping_area->id);
         }
+        $shippingfee = \App\Http\Controllers\Frontend\ShoppingController::cartShippingCharge();
 
         // কার্টের advance item গুলোর মোট
         $advanceTotal = \App\Http\Controllers\Frontend\ShoppingController::getCartAdvanceAmount();
