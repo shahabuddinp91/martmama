@@ -18,7 +18,11 @@
     }
     // প্রতিবার কার্ট দেখে নতুন করে হিসাব — যেকোনো একটি free delivery প্রোডাক্ট থাকলে ০
     $shipping = \App\Http\Controllers\Frontend\ShoppingController::cartShippingCharge();
-    $grandTotal = $grandSubtotal + $shipping;
+    // কুপন প্রতিবার কার্ট অনুযায়ী নতুন করে যাচাই; আর প্রযোজ্য না হলে $couponError এ কারণ আসে
+    $couponError = null;
+    $discount = \App\Http\Controllers\Frontend\ShoppingController::cartCouponDiscount($couponError);
+    $couponCode = Session::get('coupon_code');
+    $grandTotal = $grandSubtotal + $shipping - $discount;
 @endphp
 
 <table class="table modern-cart-table text-center mb-0 align-middle">
@@ -85,11 +89,27 @@
                 <span id="cart_shipping_cost">+ ৳ <strong>{{ $shipping }}</strong></span>
             </td>
         </tr>
+        @if($couponCode && $discount > 0)
+        <tr>
+            <th colspan="2" class="text-end pe-3 text-muted">
+                কুপন ছাড় <span class="coupon-tag ms-1">{{ $couponCode }}</span>:
+            </th>
+            <td class="fw-bold text-success fs-6">
+                <span id="cart_discount">- ৳ <strong>{{ $discount + 0 }}</strong></span>
+            </td>
+        </tr>
+        @endif
         <tr class="table-success">
             <th colspan="2" class="text-end pe-3 fs-5">সর্বমোট মূল্য:</th>
             <td class="fs-5 fw-bolder text-success">
-                <span id="grand_total">৳ <strong>{{ $grandTotal }}</strong></span>
+                <span id="grand_total">৳ <strong>{{ $grandTotal + 0 }}</strong></span>
             </td>
         </tr>
     </tfoot>
 </table>
+
+{{-- campaign পেজের কুপন বক্স প্রতিবার AJAX রেন্ডারের পর এখান থেকে অবস্থা পড়ে --}}
+<div id="couponState" hidden
+     data-code="{{ $couponCode }}"
+     data-discount="{{ $discount + 0 }}"
+     data-error="{{ $couponError }}"></div>

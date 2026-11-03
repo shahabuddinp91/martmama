@@ -257,6 +257,113 @@ class ShoppingController extends Controller
     }
 
     /**
+     * কার্টের পণ্য মূল্য — প্রতিটি আইটেমের price × qty থেকে হিসাব
+     */
+    public static function cartSubtotal(): float
+    {
+        $subtotal = 0;
+        foreach (Cart::instance('shopping')->content() as $item) {
+            $subtotal += $item->price * $item->qty;
+        }
+
+        return (float) $subtotal;
+    }
+
+    /**
+     * কুপন যাচাই — চালু আছে কিনা, মেয়াদ, মিনিমাম পারচেজ।
+     * ঠিক থাকলে ['coupon', 'discount'] (ছাড় কখনো পণ্য মূল্যের বেশি হবে না), নাহলে ['error' => মেসেজ]
+     */
+    public static function checkCoupon(?string $code, float $subtotal): array
+    {
+        $code = trim((string) $code);
+        if ($code === '') {
+            return ['error' => 'অনুগ্রহ করে কুপন কোড লিখুন'];
+        }
+
+        $coupon = Coupon::where('code', $code)->where('status', 1)->first();
+        if (!$coupon) {
+            return ['error' => 'কুপন কোডটি সঠিক নয়, আবার চেক করুন'];
+        }
+
+        $now = Carbon::now();
+        if ($coupon->valid_from && $now->lt(Carbon::parse($coupon->valid_from)->startOfDay())) {
+            return ['error' => 'এই কুপনটি এখনো চালু হয়নি'];
+        }
+        if ($coupon->valid_to && $now->gt(Carbon::parse($coupon->valid_to)->endOfDay())) {
+            return ['error' => 'দুঃখিত, এই কুপনের মেয়াদ শেষ হয়ে গেছে'];
+        }
+
+        if ($subtotal <= 0) {
+            return ['error' => 'কুপন ব্যবহার করতে আগে পণ্য নির্বাচন করুন'];
+        }
+        if ($coupon->min_purchase && $subtotal < $coupon->min_purchase) {
+            return ['error' => 'এই কুপনটি ব্যবহার করতে কমপক্ষে ৳' . ($coupon->min_purchase + 0) . ' টাকার পণ্য কিনতে হবে'];
+        }
+
+        $discount = $coupon->type == 'percent'
+            ? $subtotal * ($coupon->value / 100)
+            : (float) $coupon->value;
+
+        return ['coupon' => $coupon, 'discount' => round(min($discount, $subtotal), 2)];
+    }
+
+    /**
+     * Session-এর কুপন বর্তমান কার্ট অনুযায়ী নতুন করে হিসাব — কার্ট বদলালে percent ছাড়ও বদলায়।
+     * কুপন আর প্রযোজ্য না হলে (যেমন মিনিমাম পারচেজের নিচে নেমে গেলে) session থেকে সরিয়ে ০ রিটার্ন করে,
+     * কারণটা $error এ দেয়।
+     */
+    public static function cartCouponDiscount(?string &$error = null): float
+    {
+        $code = Session::get('coupon_code');
+        if (!$code) {
+            return 0;
+        }
+
+        $result = self::checkCoupon($code, self::cartSubtotal());
+        if (isset($result['error'])) {
+            Session::forget(['coupon_code', 'discount']);
+            $error = $result['error'];
+            return 0;
+        }
+
+        Session::put('discount', $result['discount']);
+        return $result['discount'];
+    }
+
+    // 🟢 Campaign/landing পেজ: AJAX কুপন প্রয়োগ — JSON + আপডেট করা cart_table
+    public function campaignApplyCoupon(Request $request)
+    {
+        $result = self::checkCoupon($request->input('coupon_code'), self::cartSubtotal());
+
+        if (isset($result['error'])) {
+            return response()->json(['success' => false, 'message' => $result['error']]);
+        }
+
+        Session::put('coupon_code', $result['coupon']->code);
+        Session::put('discount', $result['discount']);
+
+        return response()->json([
+            'success'  => true,
+            'message'  => 'অভিনন্দন! কুপন প্রয়োগ হয়েছে, আপনি ৳' . ($result['discount'] + 0) . ' সাশ্রয় করলেন',
+            'code'     => $result['coupon']->code,
+            'discount' => $result['discount'],
+            'html'     => view('frontEnd.partials.cart_table')->render(),
+        ]);
+    }
+
+    // 🟢 Campaign/landing পেজ: AJAX কুপন বাতিল
+    public function campaignRemoveCoupon()
+    {
+        Session::forget(['coupon_code', 'discount']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'কুপনটি সরানো হয়েছে',
+            'html'    => view('frontEnd.partials.cart_table')->render(),
+        ]);
+    }
+
+    /**
      * ЁЯЯв Area/zone select on the campaign page (#area) calls this via
      * GET route('shipping.charge', ['id' => zoneId]). Looks up that
      * zone's delivery charge, stores it in session, and returns the

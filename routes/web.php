@@ -354,6 +354,8 @@ Route::delete('/admin/complaints/{id}', [AdminComplaintController::class, 'destr
 
 Route::post('cart/apply-coupon', [ShoppingController::class, 'applyCoupon'])->name('coupon.apply');
 Route::get('cart/remove-coupon', [ShoppingController::class, 'removeCoupon'])->name('coupon.remove');
+Route::post('cart/campaign-coupon/apply', [ShoppingController::class, 'campaignApplyCoupon'])->name('campaign.coupon.apply');
+Route::post('cart/campaign-coupon/remove', [ShoppingController::class, 'campaignRemoveCoupon'])->name('campaign.coupon.remove');
 Route::prefix('admin')->middleware(['auth:admin', 'admin', 'demo_mode'])->group(function () {
     // Fund Routes
     Route::get('/fund', [FundController::class, 'index'])->name('admin.fund.index');

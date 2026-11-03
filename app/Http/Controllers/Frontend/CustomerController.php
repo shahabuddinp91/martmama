@@ -872,8 +872,9 @@ public function order_save(Request $request)
 
         // Amount ক্যালকুলেশন
         $subtotal = (float) str_replace([',','.00'],'',Cart::instance('shopping')->subtotal());
-        $discount = Session::get('discount', 0);
-        
+        // কুপন বর্তমান কার্ট অনুযায়ী আবার যাচাই করে ছাড় হিসাব (session-এর পুরনো মান নয়)
+        $discount = \App\Http\Controllers\Frontend\ShoppingController::cartCouponDiscount();
+
         // ⭐ Free Delivery Check - কার্টে যেকোনো একটি free delivery প্রোডাক্ট থাকলে shipping charge 0 সেভ হবে
         $shipping_area = ShippingCharge::find($request->area);
         if ($shipping_area) {

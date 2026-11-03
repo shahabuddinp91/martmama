@@ -7,7 +7,11 @@
     }
     // প্রতিবার কার্ট দেখে নতুন করে হিসাব — যেকোনো একটি free delivery প্রোডাক্ট থাকলে ০
     $shipping = \App\Http\Controllers\Frontend\ShoppingController::cartShippingCharge();
-    $grandTotal = $grandSubtotal + $shipping;
+    // কুপন প্রতিবার কার্ট অনুযায়ী নতুন করে যাচাই; আর প্রযোজ্য না হলে $couponError এ কারণ আসে
+    $couponError = null;
+    $discount = \App\Http\Controllers\Frontend\ShoppingController::cartCouponDiscount($couponError);
+    $couponCode = Session::get('coupon_code');
+    $grandTotal = $grandSubtotal + $shipping - $discount;
 ?>
 
 <table class="table modern-cart-table text-center mb-0 align-middle">
@@ -75,11 +79,27 @@
                 <span id="cart_shipping_cost">+ ৳ <strong><?php echo e($shipping); ?></strong></span>
             </td>
         </tr>
+        <?php if($couponCode && $discount > 0): ?>
+        <tr>
+            <th colspan="2" class="text-end pe-3 text-muted">
+                কুপন ছাড় <span class="coupon-tag ms-1"><?php echo e($couponCode); ?></span>:
+            </th>
+            <td class="fw-bold text-success fs-6">
+                <span id="cart_discount">- ৳ <strong><?php echo e($discount + 0); ?></strong></span>
+            </td>
+        </tr>
+        <?php endif; ?>
         <tr class="table-success">
             <th colspan="2" class="text-end pe-3 fs-5">সর্বমোট মূল্য:</th>
             <td class="fs-5 fw-bolder text-success">
-                <span id="grand_total">৳ <strong><?php echo e($grandTotal); ?></strong></span>
+                <span id="grand_total">৳ <strong><?php echo e($grandTotal + 0); ?></strong></span>
             </td>
         </tr>
     </tfoot>
-</table><?php /**PATH G:\xampp822\htdocs\laravel\martmama\resources\views/frontEnd/partials/cart_table.blade.php ENDPATH**/ ?>
+</table>
+
+
+<div id="couponState" hidden
+     data-code="<?php echo e($couponCode); ?>"
+     data-discount="<?php echo e($discount + 0); ?>"
+     data-error="<?php echo e($couponError); ?>"></div><?php /**PATH G:\xampp822\htdocs\laravel\martmama\resources\views/frontEnd/partials/cart_table.blade.php ENDPATH**/ ?>

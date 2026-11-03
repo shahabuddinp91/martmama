@@ -1111,6 +1111,8 @@ $brands = Brand::where('status', 1)
           ->get();
 
         Cart::instance('shopping')->destroy();
+        // নতুন কার্ট, তাই আগের কোনো কুপন রাখা হবে না
+        Session::forget(['coupon_code', 'discount']);
         $cart_count = Cart::instance('shopping')->count();
         $product = $products->first();
         if ($cart_count == 0 && $product) {
