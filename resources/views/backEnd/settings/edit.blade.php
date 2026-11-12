@@ -266,6 +266,12 @@
                                    value="{{ $edit_data->reseller_wallet_min_balance ?? 0 }}" min="0" step="1" placeholder="0">
                             <small class="text-muted">এমন পরিমাণ যা রিসেলার কখনো উত্তোলন করতে পারবে না। উত্তোলনের পর ব্যালেন্স এই অংকের কম হতে পারবে না।</small>
                         </div>
+                        <div class="mb-4">
+                            <label class="form-label-pro">ল্যান্ডিং পেজ অর্ডার বিরতি (মিনিট)</label>
+                            <input type="number" name="landing_order_interval" class="form-control custom-input"
+                                   value="{{ $edit_data->landing_order_interval ?? 20 }}" min="0" step="1" placeholder="20">
+                            <small class="text-muted">একই মোবাইল নাম্বার থেকে এই সময়ের মধ্যে ল্যান্ডিং পেজে আবার অর্ডার করা যাবে না। 0 দিলে এই চেক বন্ধ থাকবে।</small>
+                        </div>
                     </div>
                 </div>
             </div>

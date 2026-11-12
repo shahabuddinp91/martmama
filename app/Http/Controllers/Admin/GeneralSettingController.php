@@ -137,7 +137,8 @@ class GeneralSettingController extends Controller
     public function update(Request $request)
     {
         $this->validate($request, [
-            'name' => 'required'
+            'name' => 'required',
+            'landing_order_interval' => 'nullable|integer|min:0',
         ]);
         $update_data = GeneralSetting::find($request->id);
         $input = $request->all();
@@ -233,7 +234,8 @@ class GeneralSettingController extends Controller
         // Handle vendor_enabled and reseller_enabled (checkbox returns '1' if checked, null if unchecked)
         $input['vendor_enabled'] = $request->has('vendor_enabled') ? 1 : 0;
         $input['reseller_enabled'] = $request->has('reseller_enabled') ? 1 : 0;
-        
+        $input['landing_order_interval'] = (int) ($request->landing_order_interval ?? 20);
+
         $update_data->update($input);
 
         Cache::forget('general_setting');

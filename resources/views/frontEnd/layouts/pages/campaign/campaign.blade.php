@@ -971,6 +971,12 @@
 
                         <form action="{{route('customer.ordersave')}}" method="POST" data-parsley-validate="">
                             @csrf
+                            <input type="hidden" name="order_from" value="landing">
+                            @if($errors->any())
+                            <div class="alert alert-danger fw-bold mb-3" role="alert">
+                                <i class="fa-solid fa-circle-exclamation me-1"></i> {{ $errors->first() }}
+                            </div>
+                            @endif
                             <div class="form-group mb-3">
                                 <label for="name" class="fw-bold mb-1">আপনার নাম  <span class="text-danger">*</span></label>
                                 <input type="text" id="name" class="form-control shadow-sm @error('name') is-invalid @enderror" name="name" value="{{old('name')}}" placeholder="উদাঃ মোঃ রিম" required>
@@ -1391,6 +1397,11 @@
                 document.getElementById("countdown").innerHTML = "<h5 class='text-warning m-0'>অফার শেষ!</h5>";
             }
         }, 1000);
+
+        @if($errors->any())
+        // অর্ডার সাবমিটে error হলে ফর্মে স্ক্রল করে দেখানো
+        document.getElementById('order_form').scrollIntoView({behavior: 'smooth'});
+        @endif
 
         // GTM DataLayer
         window.dataLayer = window.dataLayer || [];
