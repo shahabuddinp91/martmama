@@ -463,6 +463,111 @@
             border-left: none; border-right: none; font-weight: 700;
         }
 
+        /* =====================================================
+           COUPON BOX — collapsed by default so it never distracts
+           shoppers without a code; ticket-style dashed edge makes
+           it instantly recognisable as a "discount" element.
+           ===================================================== */
+        .coupon-tag {
+            display: inline-block;
+            background: var(--forest-100);
+            color: var(--forest-700);
+            border: 1px dashed var(--forest-500);
+            border-radius: 6px;
+            padding: 0 8px;
+            font-size: .78rem;
+            font-weight: 700;
+            letter-spacing: .04em;
+            line-height: 1.7;
+        }
+        .coupon-box {
+            border: 1.5px dashed rgba(201, 138, 27, 0.55);
+            background: #FFFBF2;
+            border-radius: 12px;
+            padding: 4px 14px;
+        }
+        .coupon-toggle {
+            width: 100%;
+            background: transparent;
+            border: 0;
+            padding: 10px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            color: var(--ink);
+            text-align: left;
+        }
+        .coupon-toggle__icon {
+            width: 32px; height: 32px;
+            border-radius: 9px;
+            background: linear-gradient(160deg, var(--gold-500), var(--gold-600));
+            color: #fff;
+            display: inline-flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+            transform: rotate(-8deg);
+        }
+        .coupon-toggle__text { flex: 1 1 auto; }
+        .coupon-toggle__text small { display: block; font-weight: 400; color: #7a6a56; font-size: .8rem; line-height: 1.3; }
+        .coupon-toggle__chev { color: var(--gold-600); transition: transform .2s ease; }
+        .coupon-toggle[aria-expanded="true"] .coupon-toggle__chev { transform: rotate(180deg); }
+
+        .coupon-panel { padding: 0 0 12px; }
+        .coupon-form { display: flex; gap: 8px; }
+        .coupon-form .form-control {
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            font-weight: 700;
+            background: #fff;
+            min-width: 0;
+        }
+        .coupon-form .form-control::placeholder { text-transform: none; letter-spacing: 0; font-weight: 400; }
+        .coupon-form .form-control.is-invalid { border-color: var(--red-600); animation: couponShake .35s ease; }
+        .coupon-apply-btn {
+            flex: 0 0 auto;
+            background: var(--forest-700);
+            color: #fff;
+            border: 0;
+            border-radius: 9px;
+            padding: 0 18px;
+            font-weight: 700;
+            display: inline-flex; align-items: center; gap: 6px;
+            white-space: nowrap;
+        }
+        .btn.coupon-apply-btn:hover, .btn.coupon-apply-btn:focus { background: var(--forest-900); color: #fff; }
+        .btn.coupon-apply-btn:disabled { background: var(--forest-700); color: #fff; opacity: .7; }
+
+        .coupon-applied {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 0;
+        }
+        .coupon-applied__icon { color: var(--forest-500); font-size: 1.6rem; line-height: 1; flex-shrink: 0; }
+        .coupon-applied__info { flex: 1 1 auto; min-width: 0; line-height: 1.45; font-weight: 700; }
+        .coupon-applied__info small { display: block; font-weight: 400; color: var(--forest-700); }
+        .coupon-remove-btn {
+            flex-shrink: 0;
+            background: #fff;
+            border: 1px solid var(--line);
+            color: var(--red-600);
+            border-radius: 8px;
+            padding: 4px 10px;
+            font-size: .82rem;
+            font-weight: 700;
+        }
+        .coupon-remove-btn:hover { background: #fff1f1; border-color: rgba(214, 32, 44, .35); }
+        .coupon-remove-btn:disabled { opacity: .6; }
+
+        .coupon-msg { font-size: .85rem; font-weight: 700; line-height: 1.5; }
+        .coupon-msg:not(:empty) { padding: 0 0 10px; }
+        .coupon-msg.is-error { color: var(--red-600); }
+        .coupon-msg.is-success { color: var(--forest-700); }
+
+        .coupon-box.just-applied { animation: couponPop .45s ease; }
+        @keyframes couponPop { 0% { transform: scale(1); } 40% { transform: scale(1.02); } 100% { transform: scale(1); } }
+        @keyframes couponShake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+
         /* ---------- Checkout form ---------- */
         .checkout-wrapper {
             background: #fff; border-radius: 16px;
@@ -557,7 +662,9 @@
         $grandSubtotal += $cartItem->price * $cartItem->qty;
     }
     $shipping = \App\Http\Controllers\Frontend\ShoppingController::cartShippingCharge();
-    $grandTotal = $grandSubtotal + $shipping;
+    $grandTotal = $grandSubtotal + $shipping - \App\Http\Controllers\Frontend\ShoppingController::cartCouponDiscount();
+    // কোনো চালু কুপনই না থাকলে কুপন বক্স দেখানোর দরকার নেই
+    $hasActiveCoupon = \App\Models\Coupon::where('status', 1)->exists();
     // একটা প্রোডাক্ট হলেও variant থাকলে picker দেখাতে হবে, নাহলে সাইজ/কালার সিলেক্ট করা যায় না
     $showPicker = $products->count() > 1 || $products->contains(fn ($p) => $p->variantPrices()->exists());
 @endphp
@@ -811,6 +918,45 @@
                             ])
                         </div>
 
+                        @if($hasActiveCoupon)
+                        <div class="coupon-box mt-3" id="couponBox">
+                            {{-- কুপন না থাকা অবস্থা: ক্লিক করলে ইনপুট খোলে --}}
+                            <div id="couponEntry">
+                                <button type="button" class="coupon-toggle" id="couponToggle" aria-expanded="false" aria-controls="couponPanel">
+                                    <span class="coupon-toggle__icon"><i class="fa-solid fa-ticket-simple"></i></span>
+                                    <span class="coupon-toggle__text">
+                                        কুপন কোড আছে?
+                                        <small>এখানে ক্লিক করে কোড দিন, সাথে সাথে ছাড় পাবেন</small>
+                                    </span>
+                                    <i class="fa-solid fa-chevron-down coupon-toggle__chev"></i>
+                                </button>
+                                <div class="coupon-panel" id="couponPanel" hidden>
+                                    <div class="coupon-form">
+                                        <input type="text" id="couponInput" class="form-control shadow-sm" placeholder="কুপন কোড লিখুন" maxlength="50" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="কুপন কোড" aria-describedby="couponMsg">
+                                        <button type="button" class="btn coupon-apply-btn" id="couponApplyBtn">
+                                            <span class="spinner-border spinner-border-sm d-none" aria-hidden="true"></span>
+                                            <span class="btn-label">প্রয়োগ করুন</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- কুপন প্রয়োগ হওয়ার পরের অবস্থা --}}
+                            <div class="coupon-applied d-none" id="couponApplied">
+                                <span class="coupon-applied__icon"><i class="fa-solid fa-circle-check"></i></span>
+                                <div class="coupon-applied__info">
+                                    <span class="coupon-tag" id="couponAppliedCode"></span> কুপন প্রয়োগ হয়েছে
+                                    <small>আপনি সাশ্রয় করছেন <strong>৳<span id="couponAppliedAmount">0</span></strong></small>
+                                </div>
+                                <button type="button" class="coupon-remove-btn" id="couponRemoveBtn" aria-label="কুপন বাতিল করুন">
+                                    <i class="fa-solid fa-xmark me-1"></i>বাতিল
+                                </button>
+                            </div>
+
+                            <div class="coupon-msg" id="couponMsg" role="status" aria-live="polite"></div>
+                        </div>
+                        @endif
+
                         <div class="text-center mt-3">
                             <span class="trust-badge border-0">
                                 <i class="fa-solid fa-money-bill-wave"></i> ১০০% ক্যাশ অন ডেলিভারি 
@@ -825,6 +971,12 @@
 
                         <form action="{{route('customer.ordersave')}}" method="POST" data-parsley-validate="">
                             @csrf
+                            <input type="hidden" name="order_from" value="landing">
+                            @if($errors->any())
+                            <div class="alert alert-danger fw-bold mb-3" role="alert">
+                                <i class="fa-solid fa-circle-exclamation me-1"></i> {{ $errors->first() }}
+                            </div>
+                            @endif
                             <div class="form-group mb-3">
                                 <label for="name" class="fw-bold mb-1">আপনার নাম  <span class="text-danger">*</span></label>
                                 <input type="text" id="name" class="form-control shadow-sm @error('name') is-invalid @enderror" name="name" value="{{old('name')}}" placeholder="উদাঃ মোঃ রিম" required>
@@ -939,6 +1091,7 @@
             });
 
             syncStickyCart();
+            syncCoupon();
         });
 
         // Keep the sticky bottom bar's total + item count in sync with
@@ -980,21 +1133,29 @@
            ========================================================= */
         var __cartQueue = [];
         var __cartBusy  = false;
-        function cartAjax(url, data) {
-            __cartQueue.push({ url: url, data: data });
+        // opts (ঐচ্ছিক): { type: 'POST', dataType: 'json', success: fn, error: fn } — কুপন কলগুলো একই queue দিয়ে যায়
+        function cartAjax(url, data, opts) {
+            __cartQueue.push({ url: url, data: data, opts: opts || {} });
             __cartProcessQueue();
+        }
+        function renderCart(html) {
+            $(".cartlist").html(html);
+            syncStickyCart();
+            syncCoupon();
         }
         function __cartProcessQueue() {
             if (__cartBusy || __cartQueue.length === 0) return;
             __cartBusy = true;
             var next = __cartQueue.shift();
             $.ajax({
-                type: "GET", data: next.data, url: next.url,
+                type: next.opts.type || "GET", data: next.data, url: next.url,
+                dataType: next.opts.dataType,
                 success: function (response) {
-                    if (response) {
-                        $(".cartlist").html(response);
-                        syncStickyCart();
-                    }
+                    if (next.opts.success) { next.opts.success(response); return; }
+                    if (response) { renderCart(response); }
+                },
+                error: function () {
+                    if (next.opts.error) { next.opts.error(); }
                 },
                 complete: function () {
                     __cartBusy = false;
@@ -1098,6 +1259,128 @@
             ppSendChange(productId, 'add');
         });
 
+        /* =========================================================
+           COUPON
+           cart_table partial-এর #couponState-ই একমাত্র সত্য — প্রতিটি
+           রেন্ডারের পর syncCoupon() বক্সটাকে সেই অনুযায়ী দেখায়। কার্ট
+           কমে মিনিমাম পারচেজের নিচে নামলে সার্ভার কুপন সরিয়ে দেয়,
+           আর কারণটা এখানে মেসেজ হিসেবে দেখানো হয়।
+           ========================================================= */
+        function couponMessage(text, type) {
+            $('#couponMsg').text(text || '')
+                .toggleClass('is-error', type === 'error')
+                .toggleClass('is-success', type === 'success');
+        }
+
+        function couponSetLoading($btn, loading) {
+            $btn.prop('disabled', loading);
+            $btn.find('.spinner-border').toggleClass('d-none', !loading);
+        }
+
+        function couponOpenPanel(open, focus) {
+            $('#couponPanel').prop('hidden', !open);
+            $('#couponToggle').attr('aria-expanded', open ? 'true' : 'false');
+            if (open && focus !== false) { $('#couponInput').trigger('focus'); }
+        }
+
+        function syncCoupon() {
+            var $state = $('.cartlist #couponState');
+            if (!$('#couponBox').length || !$state.length) return;
+
+            var code     = $state.attr('data-code') || '';
+            var discount = $state.attr('data-discount') || '0';
+            var dropped  = $state.attr('data-error') || '';
+
+            // আগের মেসেজের টাকার অঙ্ক পুরনো হয়ে যেতে পারে; apply/remove নিজের মেসেজ রেন্ডারের পরে বসায়
+            couponMessage('');
+            $('#couponEntry').toggleClass('d-none', !!code);
+            $('#couponApplied').toggleClass('d-none', !code);
+
+            if (code) {
+                $('#couponAppliedCode').text(code);
+                $('#couponAppliedAmount').text(discount);
+            } else if (dropped) {
+                couponOpenPanel(true, false);
+                couponMessage('কুপনটি সরানো হয়েছে: ' + dropped, 'error');
+            }
+        }
+
+        function couponApply() {
+            var $input = $('#couponInput');
+            var code   = $.trim($input.val());
+            var $btn   = $('#couponApplyBtn');
+
+            if (!code) {
+                $input.addClass('is-invalid').trigger('focus');
+                couponMessage('অনুগ্রহ করে কুপন কোড লিখুন', 'error');
+                return;
+            }
+
+            couponSetLoading($btn, true);
+            couponMessage('');
+            cartAjax("{{ route('campaign.coupon.apply') }}", { coupon_code: code, _token: "{{ csrf_token() }}" }, {
+                type: 'POST',
+                dataType: 'json',
+                success: function (res) {
+                    couponSetLoading($btn, false);
+                    if (!res.success) {
+                        $input.removeClass('is-invalid');
+                        // reflow দিয়ে shake এনিমেশন আবার চালাই
+                        void $input[0].offsetWidth;
+                        $input.addClass('is-invalid');
+                        couponMessage(res.message, 'error');
+                        return;
+                    }
+                    $input.val('').removeClass('is-invalid');
+                    renderCart(res.html);
+                    couponMessage(res.message, 'success');
+                    $('#couponBox').removeClass('just-applied');
+                    void $('#couponBox')[0].offsetWidth;
+                    $('#couponBox').addClass('just-applied');
+
+                    window.dataLayer = window.dataLayer || [];
+                    dataLayer.push({ event: 'coupon_applied', coupon: res.code, discount: res.discount, currency: 'BDT' });
+                },
+                error: function () {
+                    couponSetLoading($btn, false);
+                    couponMessage('কিছু একটা সমস্যা হয়েছে, একটু পরে আবার চেষ্টা করুন', 'error');
+                }
+            });
+        }
+
+        $('#couponToggle').on('click', function () {
+            couponOpenPanel($('#couponPanel').prop('hidden'));
+        });
+
+        $('#couponApplyBtn').on('click', couponApply);
+
+        $('#couponInput').on('keydown', function (e) {
+            // Enter চাপলে অর্ডার ফর্ম নয়, কুপন প্রয়োগ হবে
+            if (e.which === 13) { e.preventDefault(); couponApply(); }
+        }).on('input', function () {
+            $(this).removeClass('is-invalid');
+            if ($('#couponMsg').hasClass('is-error')) { couponMessage(''); }
+        });
+
+        $('#couponRemoveBtn').on('click', function () {
+            var $btn = $(this);
+            $btn.prop('disabled', true);
+            cartAjax("{{ route('campaign.coupon.remove') }}", { _token: "{{ csrf_token() }}" }, {
+                type: 'POST',
+                dataType: 'json',
+                success: function (res) {
+                    $btn.prop('disabled', false);
+                    renderCart(res.html);
+                    couponOpenPanel(false);
+                    couponMessage(res.message, 'success');
+                },
+                error: function () {
+                    $btn.prop('disabled', false);
+                    couponMessage('কিছু একটা সমস্যা হয়েছে, একটু পরে আবার চেষ্টা করুন', 'error');
+                }
+            });
+        });
+
         // Countdown Logic
         const deadline = new Date("{{ $campaign_data->deadline }}").getTime();
         const x = setInterval(function () {
@@ -1114,6 +1397,11 @@
                 document.getElementById("countdown").innerHTML = "<h5 class='text-warning m-0'>অফার শেষ!</h5>";
             }
         }, 1000);
+
+        @if($errors->any())
+        // অর্ডার সাবমিটে error হলে ফর্মে স্ক্রল করে দেখানো
+        document.getElementById('order_form').scrollIntoView({behavior: 'smooth'});
+        @endif
 
         // GTM DataLayer
         window.dataLayer = window.dataLayer || [];

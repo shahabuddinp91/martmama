@@ -862,6 +862,23 @@ public function order_save(Request $request)
             return redirect()->back();
         }
 
+        // ⭐ ল্যান্ডিং পেজ: একই মোবাইল নাম্বারে নির্দিষ্ট মিনিটের মধ্যে আবার অর্ডার করা যাবে না
+        if ($request->order_from === 'landing') {
+            $interval = (int) (GeneralSetting::orderBy('id', 'desc')->value('landing_order_interval') ?? 20);
+            if ($interval > 0) {
+                $lastOrderAt = Shipping::where('phone', $request->phone)
+                    ->where('created_at', '>=', now()->subMinutes($interval))
+                    ->latest()
+                    ->value('created_at');
+                if ($lastOrderAt) {
+                    // ল্যান্ডিং পেজে Toastr রেন্ডার হয় না, তাই phone ফিল্ডের নিচে error দেখানো হচ্ছে
+                    return redirect()->back()
+                        ->withInput()
+                        ->withErrors(['phone' => 'আপনার অর্ডারটি ইতিমধ্যে গ্রহণ করা হয়েছে।']);
+                }
+            }
+        }
+
         // ⭐ কার্টে ডিজিটাল প্রোডাক্ট আছে কি না চেক
         $hasDigital = \App\Http\Controllers\Frontend\ShoppingController::hasDigitalProductInCart();
 
@@ -872,8 +889,9 @@ public function order_save(Request $request)
 
         // Amount ক্যালকুলেশন
         $subtotal = (float) str_replace([',','.00'],'',Cart::instance('shopping')->subtotal());
-        $discount = Session::get('discount', 0);
-        
+        // কুপন বর্তমান কার্ট অনুযায়ী আবার যাচাই করে ছাড় হিসাব (session-এর পুরনো মান নয়)
+        $discount = \App\Http\Controllers\Frontend\ShoppingController::cartCouponDiscount();
+
         // ⭐ Free Delivery Check - কার্টে যেকোনো একটি free delivery প্রোডাক্ট থাকলে shipping charge 0 সেভ হবে
         $shipping_area = ShippingCharge::find($request->area);
         if ($shipping_area) {
